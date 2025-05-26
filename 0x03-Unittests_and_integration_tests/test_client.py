@@ -144,3 +144,54 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         client = GithubOrgClient('testorg')
         repos = client.public_repos(license="apache-2.0")
         self.assertEqual(repos, self.apache2_repos)
+
+@parameterized_class(('org_payload', 'repos_payload', 'expected_repos', 'apache2_repos'), 
+                   TEST_PAYLOADS)
+class TestIntegrationGithubOrgClient(unittest.TestCase):
+    """Integration test for GithubOrgClient.public_repos"""
+    
+    @classmethod
+    def setUpClass(cls):
+        """Set up class fixtures before running tests"""
+        cls.get_patcher = patch('requests.get')
+        cls.mock_get = cls.get_patcher.start()
+        
+        # Configure side effect to return different payloads based on URL
+        def side_effect(url):
+            mock_response = Mock()
+            if "orgs/" in url:
+                mock_response.json.return_value = cls.org_payload
+            elif "repos" in url:
+                mock_response.json.return_value = cls.repos_payload
+            return mock_response
+            
+        cls.mock_get.side_effect = side_effect
+
+    @classmethod
+    def tearDownClass(cls):
+        """Stop the patcher after all tests"""
+        cls.get_patcher.stop()
+
+    def test_public_repos(self):
+        """Test public_repos returns expected repos"""
+        client = GithubOrgClient('testorg')
+        repos = client.public_repos()
+        self.assertEqual(repos, self.expected_repos)
+        
+        # Verify the mock was called with the correct URLs
+        org_url = f"https://api.github.com/orgs/testorg"
+        repos_url = self.org_payload['repos_url']
+        self.mock_get.assert_any_call(org_url)
+        self.mock_get.assert_any_call(repos_url)
+
+    def test_public_repos_with_license(self):
+        """Test public_repos with license filter"""
+        client = GithubOrgClient('testorg')
+        repos = client.public_repos(license="apache-2.0")
+        self.assertEqual(repos, self.apache2_repos)
+        
+        # Verify the mock was called with the correct URLs
+        org_url = f"https://api.github.com/orgs/testorg"
+        repos_url = self.org_payload['repos_url']
+        self.mock_get.assert_any_call(org_url)
+        self.mock_get.assert_any_call(repos_url)
