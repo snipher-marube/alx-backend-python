@@ -45,7 +45,7 @@ class User(AbstractUser):
         OFFLINE = 'OFFLINE', _("Offline")
     
     # Using UUID as primary key instead of BigAutoField
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     username = models.CharField(
         max_length=255,
         verbose_name=_('username'),
@@ -95,7 +95,7 @@ class User(AbstractUser):
         return f"{self.get_full_name()}"
 
 class Conversation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     participants = models.ManyToManyField(User, related_name='conversations')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -112,7 +112,7 @@ class Conversation(models.Model):
         return f"Conversation between {', '.join(usernames)}"
 
 class Message(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
@@ -123,11 +123,12 @@ class Message(models.Model):
         on_delete=models.CASCADE,
         related_name='sent_messages'
     )
-    content = models.TextField()
+    message_body = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
     read = models.BooleanField(default=False)
     edited = models.BooleanField(default=False)
     deleted = models.BooleanField(default=False)
+    sent_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['timestamp']
