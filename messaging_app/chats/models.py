@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
 from phonenumber_field.modelfields import PhoneNumberField
+import uuid
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -12,7 +13,6 @@ class UserManager(BaseUserManager):
             raise ValueError('The Email must be set')
         email = self.normalize_email(email)
 
-        # Autogenerate username if not provided
         if not extra_fields.get('username'):
             base_username = email.split('@')[0]
             username = slugify(base_username.replace('.', '_'))
@@ -39,25 +39,34 @@ class UserManager(BaseUserManager):
 
         return self.create_user(email, password, **extra_fields)
 
-
 class User(AbstractUser):
     class OnlineStatus(models.TextChoices):
         ONLINE = 'ONLINE', _("Online")
         OFFLINE = 'OFFLINE', _("Offline")
-
-    username = models.CharField(max_length=255,
-                                verbose_name=_('username'),
-                                unique=True,
-                                null=True,
-                                blank=True,
-                                help_text=_('username will automatically be generated form the email'))
-    phone = PhoneNumberField(unique=True,
-                             verbose_name=_('Phone Number'))
+    
+    # Using UUID as primary key instead of BigAutoField
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    username = models.CharField(
+        max_length=255,
+        verbose_name=_('username'),
+        unique=True,
+        null=True,
+        blank=True,
+        help_text=_('username will automatically be generated from the email')
+    )
+    phone_number = PhoneNumberField(
+        unique=True,
+        verbose_name=_('Phone Number')
+    )
     email = models.EmailField(unique=True)
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
-    bio = models.TextField()
+    bio = models.TextField(blank=True)
     last_active = models.DateTimeField(auto_now=True)
-    online_status = models.CharField(max_length=15, choices=OnlineStatus.choices)
+    online_status = models.CharField(
+        max_length=15,
+        choices=OnlineStatus.choices,
+        default=OnlineStatus.OFFLINE
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     USERNAME_FIELD = 'email'
@@ -86,11 +95,12 @@ class User(AbstractUser):
         return f"{self.get_full_name()}"
 
 class Conversation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     participants = models.ManyToManyField(User, related_name='conversations')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_group_chat = models.BooleanField(default=False)
-    name = models.CharField(max_length=255, blank=True, null=True) # for group chats
+    name = models.CharField(max_length=255, blank=True, null=True)
     
     class Meta:
         ordering = ['-updated_at']
@@ -102,12 +112,17 @@ class Conversation(models.Model):
         return f"Conversation between {', '.join(usernames)}"
 
 class Message(models.Model):
-    converstion = models.ForeignKey(Conversation,
-                                    on_delete=models.CASCADE,
-                                    related_name='messages')
-    sender = models.ForeignKey(User,
-                               on_delete=models.CASCADE,
-                               related_name='sent_messages')
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sent_messages'
+    )
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
     read = models.BooleanField(default=False)
@@ -117,9 +132,5 @@ class Message(models.Model):
     class Meta:
         ordering = ['timestamp']
 
-        def __str__(self):
-            return f"Message from {self.sender.get_full_name()} at {self.timestamp}"
-
-   
-    
-    
+    def __str__(self):
+        return f"Message from {self.sender.get_full_name()} at {self.timestamp}"
