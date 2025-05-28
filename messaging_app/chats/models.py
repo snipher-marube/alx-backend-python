@@ -124,14 +124,13 @@ class Message(models.Model):
         related_name='sent_messages'
     )
     message_body = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)
     read = models.BooleanField(default=False)
     edited = models.BooleanField(default=False)
     deleted = models.BooleanField(default=False)
     sent_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['timestamp']
+        ordering = ['sent_at']
 
     def __str__(self):
-        return f"Message from {self.sender.get_full_name()} at {self.timestamp}"
+        return f"Message from {self.sender.get_full_name()} at {self.sent_at}"
