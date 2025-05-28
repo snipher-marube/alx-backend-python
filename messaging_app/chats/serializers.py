@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from phonenumber_field.serializerfields import PhoneNumberField
 from .models import User, Conversation, Message
-from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+
+from rest_framework.serializers import CharField
 
 class UserSerializer(serializers.ModelSerializer):
     phone_number = PhoneNumberField()
@@ -75,6 +76,13 @@ class ConversationSerializer(serializers.ModelSerializer):
             return MessageSerializer(last_message).data
         return None
 
+    name = CharField(
+        max_length=100,
+        required=False,
+        allow_null=True,
+        help_text="Name of the conversation (required for group chats)"
+    )
+
     def validate_name(self, value):
         if self.initial_data.get('is_group_chat') and not value:
             raise serializers.ValidationError(_("Group chats must have a name"))
@@ -100,11 +108,9 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ['conversation_id']
     
     def validate_participant_ids(self, value):
-        # Ensure at least one other participant
         if len(value) < 1:
             raise serializers.ValidationError(_("You must specify at least one participant"))
         
-        # Check if users exist
         existing_users = User.objects.filter(user_id__in=value).count()
         if existing_users != len(value):
             raise serializers.ValidationError(_("One or more participants do not exist"))
@@ -114,16 +120,11 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         participant_ids = validated_data.pop('participant_ids')
         conversation = Conversation.objects.create(**validated_data)
-
-        # Add participants to the conversation
         participants = User.objects.filter(user_id__in=participant_ids)
         conversation.participants.add(*participants)
-        
-        # Add current user if not already included
         current_user = self.context['request'].user
         if current_user not in conversation.participants.all():
             conversation.participants.add(current_user)
-            
         return conversation
     
 class MessageCreateSerializer(serializers.ModelSerializer):
@@ -137,6 +138,5 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ['message_id']
 
     def create(self, validated_data):
-        # Automatically set the sender to the current user
         validated_data['sender'] = self.context['request'].user
         return super().create(validated_data)
