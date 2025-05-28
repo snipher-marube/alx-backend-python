@@ -3,7 +3,6 @@ from phonenumber_field.serializerfields import PhoneNumberField
 from .models import User, Conversation, Message
 from django.utils.translation import gettext_lazy as _
 
-from rest_framework.serializers import CharField
 
 class UserSerializer(serializers.ModelSerializer):
     phone_number = PhoneNumberField()
@@ -76,7 +75,7 @@ class ConversationSerializer(serializers.ModelSerializer):
             return MessageSerializer(last_message).data
         return None
 
-    name = CharField(
+    name = serializers.CharField(
         max_length=100,
         required=False,
         allow_null=True,
