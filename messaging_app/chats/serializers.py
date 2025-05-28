@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from phonenumber_field.serializerfields import PhoneNumberField
 from .models import User, Conversation, Message
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 class UserSerializer(serializers.ModelSerializer):
     phone_number = PhoneNumberField()
@@ -41,6 +43,13 @@ class MessageSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['message_id', 'sent_at', 'sender']
     
+    def validate_message_body(self, value):
+        if not value.strip():
+            raise serializers.ValidationError(_("Message cannot be empty"))
+        if len(value) > 2000:
+            raise serializers.ValidationError(_("Message is too long (max 2000 characters)"))
+        return value
+
 class ConversationSerializer(serializers.ModelSerializer):
     participants = UserSerializer(many=True, read_only=True)
     messages = MessageSerializer(many=True, read_only=True)
@@ -66,7 +75,14 @@ class ConversationSerializer(serializers.ModelSerializer):
             return MessageSerializer(last_message).data
         return None
 
-class ConversationCreateSearializer(serializers.ModelSerializer):
+    def validate_name(self, value):
+        if self.initial_data.get('is_group_chat') and not value:
+            raise serializers.ValidationError(_("Group chats must have a name"))
+        if value and len(value) > 100:
+            raise serializers.ValidationError(_("Name is too long (max 100 characters)"))
+        return value
+
+class ConversationCreateSerializer(serializers.ModelSerializer):
     participant_ids = serializers.ListField(
         child=serializers.UUIDField(),
         write_only=True,
@@ -83,13 +99,31 @@ class ConversationCreateSearializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['conversation_id']
     
+    def validate_participant_ids(self, value):
+        # Ensure at least one other participant
+        if len(value) < 1:
+            raise serializers.ValidationError(_("You must specify at least one participant"))
+        
+        # Check if users exist
+        existing_users = User.objects.filter(user_id__in=value).count()
+        if existing_users != len(value):
+            raise serializers.ValidationError(_("One or more participants do not exist"))
+        
+        return value
+    
     def create(self, validated_data):
         participant_ids = validated_data.pop('participant_ids')
         conversation = Conversation.objects.create(**validated_data)
 
-        # Add participant to the conversation
-        participants = User.objects.filter(id__in=participant_ids)
+        # Add participants to the conversation
+        participants = User.objects.filter(user_id__in=participant_ids)
         conversation.participants.add(*participants)
+        
+        # Add current user if not already included
+        current_user = self.context['request'].user
+        if current_user not in conversation.participants.all():
+            conversation.participants.add(current_user)
+            
         return conversation
     
 class MessageCreateSerializer(serializers.ModelSerializer):
@@ -102,7 +136,7 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['message_id']
 
-        def create(self, validated_data):
-            # Automatically set the sender to the current user
-            validated_data['sender'] = self.context['request'].user
-            return super().create(validated_data)
+    def create(self, validated_data):
+        # Automatically set the sender to the current user
+        validated_data['sender'] = self.context['request'].user
+        return super().create(validated_data)
