@@ -10,6 +10,7 @@ from .serializers import (
     MessageCreateSerializer
 )
 from .permissions import IsParticipantOfConversation
+from .filters import MessageFilter
 
 class ConversationViewSet(viewsets.ModelViewSet):
     queryset = Conversation.objects.all()
@@ -52,6 +53,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [IsParticipantOfConversation]
     filter_backends = [filters.OrderingFilter]
+    filterset_class = MessageFilter
     ordering_fields = ['sent_at']
     ordering = ['-sent_at']
 
