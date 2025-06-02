@@ -14,6 +14,7 @@ class UserSerializer(serializers.ModelSerializer):
             'email',
             'first_name',
             'last_name',
+            'phone_number',
             'profile_picture',
             'bio',
             'last_active',
@@ -23,7 +24,8 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['user_id', 'created_at', 'last_active']
         extra_kwargs = {
             'profile_picture': {'required': False},
-            'bio': {'required': False}
+            'bio': {'required': False},
+            'phone_number': {'required': False}
         }
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
