@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import viewsets, permissions, status, filters, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -8,12 +9,12 @@ from .serializers import (
     MessageSerializer,
     MessageCreateSerializer
 )
-from django.db.models import Q
+from .permissions import IsParticipant, IsMessageSenderOrParticipant
 
 class ConversationViewSet(viewsets.ModelViewSet):
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsParticipant]
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['updated_at', 'created_at']
     ordering = ['-updated_at']
@@ -49,7 +50,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsMessageSenderOrParticipant]
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['sent_at']
     ordering = ['-sent_at']

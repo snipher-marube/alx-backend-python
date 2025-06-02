@@ -1,8 +1,8 @@
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from phonenumber_field.serializerfields import PhoneNumberField
 from .models import User, Conversation, Message
-from django.utils.translation import gettext_lazy as _
-
 
 class UserSerializer(serializers.ModelSerializer):
     phone_number = PhoneNumberField()
@@ -25,6 +25,18 @@ class UserSerializer(serializers.ModelSerializer):
             'profile_picture': {'required': False},
             'bio': {'required': False}
         }
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['user'] = UserSerializer(self.user).data
+        return data
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['user_id'] = str(user.user_id)
+        token['username'] = user.username
+        return token
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
