@@ -73,3 +73,4 @@ class MessageViewSet(viewsets.ModelViewSet):
         if self.request.user not in conversation.participants.all():
             raise serializers.ValidationError("Not a participant")
         serializer.save(sender=self.request.user)
+        
