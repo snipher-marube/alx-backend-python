@@ -1,4 +1,5 @@
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework import permissions
 
 class IsParticipantOfConversation(IsAuthenticated):
     """
