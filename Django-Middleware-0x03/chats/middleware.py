@@ -1,6 +1,7 @@
 from datetime import datetime, time, timedelta
 from collections import defaultdict
 from django.http import HttpResponseForbidden
+
 class RequestLoggingMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -103,8 +104,9 @@ class OffensiveLanguageMiddleware:
             if t > current_time - timedelta(seconds=self.TIME_WINDOW)
         ]
         return len(requests_in_window) >= self.RATE_LIMIT
-    
-class RolePermissionMiddleware:
+
+
+class RolepermissionMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         # Define protected paths and required roles
@@ -112,16 +114,14 @@ class RolePermissionMiddleware:
             '/admin/': ['admin'],
             '/moderate/': ['admin', 'moderator'],
             '/delete/': ['admin'],
-            # Add more paths and required roles as needed
         }
 
     def __call__(self, request):
         current_path = request.path
         
-        # Check if the current path requires special permissions
+        # Check if current path is protected
         for protected_path, required_roles in self.PROTECTED_PATHS.items():
             if current_path.startswith(protected_path):
-                # Check if user is authenticated and has required role
                 if not request.user.is_authenticated:
                     return HttpResponseForbidden("Authentication required")
                 
@@ -131,18 +131,20 @@ class RolePermissionMiddleware:
                     )
                 break
 
-        response = self.get_response(request)
-        return response
+        return self.get_response(request)
 
     def has_required_role(self, user, required_roles):
-        """
-        Check if user has any of the required roles.
-        Implement this based on your user role system.
-        """
-        # Option 1: Using Django's built-in is_staff and is_superuser
-        if 'admin' in required_roles and (user.is_superuser or user.is_staff):
-            return True
-        if 'moderator' in required_roles and hasattr(user, 'is_moderator') and user.is_moderator:
+        """Check if user has any of the required roles"""
+        # Implementation for different role systems:
+        
+        # 1. For Django's built-in admin/staff:
+        if 'admin' in required_roles and user.is_superuser:
             return True
         
+        # 2. For custom role fields (adjust as needed):
+        if hasattr(user, 'role') and user.role in required_roles:
+            return True
+            
+       
+            
         return False
