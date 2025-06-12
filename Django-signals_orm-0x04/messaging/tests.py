@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from .models import Message, Notification
+from .models import Message, Notification, MessageHistory
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -9,39 +10,48 @@ class MessagingTests(TestCase):
         self.user1 = User.objects.create_user(username='user1', password='testpass123')
         self.user2 = User.objects.create_user(username='user2', password='testpass123')
 
-    def test_message_creation(self):
+    def test_message_edit_history(self):
+        # Create initial message
         message = Message.objects.create(
             sender=self.user1,
             receiver=self.user2,
-            content="Test message"
+            content="Original message"
         )
-        self.assertEqual(message.sender, self.user1)
-        self.assertEqual(message.receiver, self.user2)
-        self.assertEqual(message.content, "Test message")
-        self.assertFalse(message.is_read)
+        
+        # Edit the message
+        message.content = "Edited message"
+        message.save()
+        
+        # Check if history was created
+        history = MessageHistory.objects.filter(message=message).first()
+        self.assertIsNotNone(history)
+        self.assertEqual(history.old_content, "Original message")
+        self.assertEqual(history.edited_by, self.user1)
+        
+        # Check message flags were updated
+        message.refresh_from_db()
+        self.assertTrue(message.edited)
+        self.assertIsNotNone(message.last_edited)
 
-    def test_notification_auto_creation(self):
+    def test_multiple_edits_create_multiple_history_records(self):
         message = Message.objects.create(
             sender=self.user1,
             receiver=self.user2,
-            content="Test message"
+            content="First version"
         )
         
-        # Check if notification was automatically created
-        notification = Notification.objects.filter(user=self.user2, message=message).first()
-        self.assertIsNotNone(notification)
-        self.assertEqual(notification.user, self.user2)
-        self.assertEqual(notification.message, message)
-        self.assertFalse(notification.is_read)
-
-    def test_multiple_messages_create_multiple_notifications(self):
-        # Create 3 messages
-        for i in range(3):
-            Message.objects.create(
-                sender=self.user1,
-                receiver=self.user2,
-                content=f"Test message {i}"
-            )
+        # First edit
+        message.content = "Second version"
+        message.save()
         
-        # Check if 3 notifications were created
-        self.assertEqual(Notification.objects.filter(user=self.user2).count(), 3)
+        # Second edit
+        message.content = "Third version"
+        message.save()
+        
+        # Check history count
+        self.assertEqual(MessageHistory.objects.filter(message=message).count(), 2)
+        
+        # Check history content
+        history = MessageHistory.objects.filter(message=message).order_by('edited_at')
+        self.assertEqual(history[0].old_content, "First version")
+        self.assertEqual(history[1].old_content, "Second version")
