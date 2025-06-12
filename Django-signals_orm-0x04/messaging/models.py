@@ -4,6 +4,25 @@ from django.utils import timezone
 
 User = get_user_model()
 
+class UnreadMessagesManager(models.Manager):
+    """
+    Custom manager for filtering unread messages for a specific user
+    """
+    def for_user(self, user):
+        return self.get_queryset().filter(
+            receiver=user,
+            is_read=False
+        ).select_related(
+            'sender',
+            'parent_message'
+        ).only(
+            'id',
+            'sender__username',
+            'content',
+            'timestamp',
+            'parent_message__id'
+        )
+
 class Message(models.Model):
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
     receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
@@ -21,14 +40,26 @@ class Message(models.Model):
     )
     is_thread_starter = models.BooleanField(default=False)
 
+    # Default manager
+    objects = models.Manager()
+    
+    # Custom manager for unread messages
+    unread = UnreadMessagesManager()
+
     def __str__(self):
         return f"Message from {self.sender} to {self.receiver}"
 
     def save(self, *args, **kwargs):
-        # Automatically set is_thread_starter based on parent_message
         if self.parent_message is None:
             self.is_thread_starter = True
         super().save(*args, **kwargs)
+
+    def mark_as_read(self):
+        """
+        Helper method to mark a message as read
+        """
+        self.is_read = True
+        self.save(update_fields=['is_read'])
 
     def get_thread(self):
         """
@@ -53,6 +84,7 @@ class Message(models.Model):
         indexes = [
             models.Index(fields=['parent_message']),
             models.Index(fields=['is_thread_starter']),
+            models.Index(fields=['is_read']),
         ]
 
 class MessageHistory(models.Model):
