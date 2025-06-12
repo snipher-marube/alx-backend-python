@@ -1,4 +1,4 @@
-from django.db.models.signals import pre_save, post_save
+from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from .models import Message, MessageHistory, Notification
 from django.contrib.auth import get_user_model
@@ -39,3 +39,15 @@ def create_message_notification(sender, instance, created, **kwargs):
             message=instance,
             is_read=False
         )
+
+
+@receiver(post_delete, sender=User)
+def cleanup_user_data(sender, instance, **kwargs):
+    """
+    Clean up all related data when a user is deleted.
+    This handles cases where CASCADE isn't sufficient or we need custom logic.
+    """
+    # Messages where user is sender or receiver (handled by CASCADE)
+    # Notifications related to user (handled by CASCADE)
+    # MessageHistory where user is editor
+    MessageHistory.objects.filter(edited_by=instance).update(edited_by=None)
