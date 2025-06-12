@@ -40,14 +40,20 @@ def create_message_notification(sender, instance, created, **kwargs):
             is_read=False
         )
 
-
 @receiver(post_delete, sender=User)
 def cleanup_user_data(sender, instance, **kwargs):
     """
     Clean up all related data when a user is deleted.
-    This handles cases where CASCADE isn't sufficient or we need custom logic.
+    Explicitly handles deletion of messages, notifications, and updates message history.
     """
-    # Messages where user is sender or receiver (handled by CASCADE)
-    # Notifications related to user (handled by CASCADE)
-    # MessageHistory where user is editor
+    # Delete all messages where user is either sender or receiver
+    Message.objects.filter(sender=instance).delete()
+    Message.objects.filter(receiver=instance).delete()
+    
+    # Delete all notifications for the user
+    Notification.objects.filter(user=instance).delete()
+    
+    # For messages where this user edited them, set edited_by to None
     MessageHistory.objects.filter(edited_by=instance).update(edited_by=None)
+    
+    
