@@ -6,10 +6,12 @@ from django.contrib.auth import logout
 from django.db.models import Q
 from .models import Message
 from django.contrib.auth import get_user_model
+from django.views.decorators.cache import cache_page
 
 User = get_user_model()
 
 @login_required
+@cache_page(60)
 def message_list(request):
     """
     View to display all conversations for the current user, optimized with select_related
@@ -33,6 +35,7 @@ def message_list(request):
     })
 
 @login_required
+@cache_page(60)
 def message_thread(request, message_id):
     """
     View to display a complete message thread with all replies
