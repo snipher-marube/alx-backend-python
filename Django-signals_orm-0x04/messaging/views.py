@@ -104,3 +104,67 @@ def delete_user(request):
         user.delete()
         messages.success(request, 'Your account has been successfully deleted.')
         return redirect('home')
+    
+
+
+@login_required
+def inbox(request):
+    """
+    View to display unread messages in user's inbox
+    Uses custom manager with optimized query
+    """
+    unread_messages = Message.unread.unread_for_user(request.user)
+    
+    return render(request, 'messaging/inbox.html', {
+        'unread_messages': unread_messages
+    })
+
+@login_required
+def mark_as_read(request, message_id):
+    """
+    View to mark a message as read
+    """
+    message = Message.objects.filter(
+        receiver=request.user,
+        id=message_id
+    ).first()
+    
+    if message:
+        message.is_read = True
+        message.save(update_fields=['is_read'])
+        messages.success(request, "Message marked as read")
+    else:
+        messages.error(request, "Message not found")
+    
+    return redirect('inbox')
+
+@login_required
+def message_detail(request, message_id):
+    """
+    View to display a single message and mark it as read
+    """
+    message = Message.objects.filter(
+        receiver=request.user,
+        id=message_id
+    ).select_related(
+        'sender'
+    ).only(
+        'id',
+        'content',
+        'timestamp',
+        'sender__username',
+        'is_read'
+    ).first()
+    
+    if not message:
+        messages.error(request, "Message not found")
+        return redirect('inbox')
+    
+    # Mark as read when viewed
+    if not message.is_read:
+        message.is_read = True
+        message.save(update_fields=['is_read'])
+    
+    return render(request, 'messaging/message_detail.html', {
+        'message': message
+    })
