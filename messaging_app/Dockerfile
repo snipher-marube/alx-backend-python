@@ -13,7 +13,7 @@ ENV PYTHONUNBUFFERED 1
 WORKDIR /code
 
 # Install dependencies
-COPY requirements.txt .
+COPY Requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
