@@ -6,12 +6,13 @@ services:
     image: mysql:8.0
     restart: always
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_DATABASE: ${MYSQL_DB}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql  # This persists the database data
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql  # Optional: for initial SQL scripts
     ports:
       - "3306:3306"
     networks:
@@ -19,14 +20,14 @@ services:
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: python3 manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/code
     ports:
       - "8000:8000"
     environment:
       DB_HOST: db
-      DB_NAME: ${MYSQL_DATABASE}
+      DB_NAME: ${MYSQL_DB}
       DB_USER: ${MYSQL_USER}
       DB_PASSWORD: ${MYSQL_PASSWORD}
     depends_on:
@@ -35,7 +36,8 @@ services:
       - messaging_network
 
 volumes:
-  mysql_data:
+  mysql_data:  # Named volume declaration for persistent storage
+    driver: local
 
 networks:
   messaging_network:
