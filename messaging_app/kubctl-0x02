@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Deploy blue and green versions
+echo "Deploying blue version..."
+kubectl apply -f blue_deployment.yaml
+
+echo "Deploying green version..."
+kubectl apply -f green_deployment.yaml
+
+echo "Creating service..."
+kubectl apply -f kubeservice.yaml
+
+# Check green deployment logs
+echo "Checking green version logs..."
+GREEN_POD=$(kubectl get pods -l version=green -o jsonpath='{.items[0].metadata.name}')
+kubectl logs $GREEN_POD
+
+# Function to switch traffic
+switch_traffic() {
+  echo "Switching traffic to $1 version..."
+  kubectl patch service django-messaging-service -p "{\"spec\":{\"selector\":{\"version\":\"$1\"}}}"
+  echo "Traffic now routed to $1 version"
+}
+
+# Verify deployments
+echo "Current deployments:"
+kubectl get deployments -l app=django-messaging
+
+echo "Current pods:"
+kubectl get pods -l app=django-messaging
+
+# Menu for traffic switching
+PS3='Select version to route traffic to: '
+options=("blue" "green" "quit")
+select opt in "${options[@]}"
+do
+    case $opt in
+        "blue")
+            switch_traffic "blue"
+            ;;
+        "green")
+            switch_traffic "green"
+            ;;
+        "quit")
+            break
+            ;;
+        *) echo "invalid option $REPLY";;
+    esac
+done

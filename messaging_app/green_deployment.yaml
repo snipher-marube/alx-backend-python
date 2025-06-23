@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-messaging-app-green
+  labels:
+    app: django-messaging
+    version: green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: django-messaging
+      version: green
+  template:
+    metadata:
+      labels:
+        app: django-messaging
+        version: green
+    spec:
+      containers:
+      - name: django-app
+        image: your-docker-username/django-messaging-app:v2  # Green version
+        ports:
+        - containerPort: 8000
+        env:
+        - name: VERSION
+          value: "green"
+        # Add other environment variables as needed
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
