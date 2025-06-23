@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Function to continuously test the application
+test_application() {
+  SERVICE_URL="http://localhost:8000"
+  echo "Starting continuous application testing..."
+  echo "Press Ctrl+C to stop testing"
+  
+  # Set up port-forwarding
+  kubectl port-forward svc/django-messaging-service 8000:8000 > /dev/null 2>&1 &
+  PORT_FORWARD_PID=$!
+  
+  # Wait for port-forward to be ready
+  sleep 3
+  
+  while true; do
+    timestamp=$(date +"%Y-%m-%d %T")
+    if response=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL/health/); then
+      echo "[$timestamp] HTTP $response - Service healthy"
+    else
+      echo "[$timestamp] ERROR - Service unavailable"
+    fi
+    sleep 1
+  done
+  
+  # Cleanup port-forwarding when done
+  kill $PORT_FORWARD_PID
+}
+
+# Start testing in background
+test_application &
+TEST_PID=$!
+
+# Apply the updated deployment
+echo "Applying updated deployment..."
+kubectl apply -f blue_deployment.yaml
+
+# Monitor the rollout
+echo "Monitoring rollout status..."
+kubectl rollout status deployment/django-messaging-app-blue --timeout=300s
+
+if [ $? -eq 0 ]; then
+  echo "Rollout completed successfully"
+else
+  echo "Rollout failed"
+  kill $TEST_PID
+  exit 1
+fi
+
+# Verify the update
+echo "Verifying deployment..."
+kubectl get deployments -l app=django-messaging
+kubectl get pods -l app=django-messaging -o wide
+kubectl describe deployment django-messaging-app-blue | grep Image
+
+# Clean up
+kill $TEST_PID
+echo "Rolling update verification complete"
