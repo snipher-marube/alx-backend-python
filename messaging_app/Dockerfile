@@ -6,8 +6,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     rm -rf /var/lib/apt/lists/*
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Set work directory
 WORKDIR /code
@@ -15,7 +15,7 @@ WORKDIR /code
 # Install dependencies
 COPY Requirements.txt .
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install -r Requirements.txt
 
 # Copy project
 COPY . .
