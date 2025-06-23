@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# kubctl-0x01 - Script to scale, test, and monitor a Django app in Kubernetes
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to install wrk if not present
+install_wrk() {
+    if ! command_exists wrk; then
+        echo "wrk is not installed. Installing now..."
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            sudo apt-get update && sudo apt-get install -y wrk
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+            brew install wrk
+        else
+            echo "Unsupported OS. Please install wrk manually."
+            exit 1
+        fi
+    fi
+}
+
+# Function to get service URL
+get_service_url() {
+    # For ClusterIP services, we'll use port-forwarding
+    kubectl port-forward svc/django-messaging-service 8000:8000 > /dev/null 2>&1 &
+    PORT_FORWARD_PID=$!
+    echo "http://localhost:8000"
+}
+
+# Main script execution
+echo "=== Scaling Django App Deployment ==="
+
+# Scale the deployment to 3 replicas
+echo "Scaling deployment to 3 replicas..."
+kubectl scale deployment django-messaging-app --replicas=3
+
+# Verify scaling
+echo "Verifying pods..."
+kubectl get pods -l app=django-messaging
+
+# Wait for pods to be ready
+echo "Waiting for pods to be ready..."
+kubectl wait --for=condition=Ready pods -l app=django-messaging --timeout=60s
+
+# Install wrk if needed
+install_wrk
+
+# Get service URL
+SERVICE_URL=$(get_service_url)
+echo "Testing service at: $SERVICE_URL"
+
+# Perform load testing
+echo "=== Starting Load Testing ==="
+echo "Running wrk for 30 seconds with 10 connections and 2 threads..."
+wrk -t2 -c10 -d30s $SERVICE_URL
+
+# Monitor resource usage
+echo "=== Monitoring Resource Usage ==="
+echo "Current resource usage:"
+kubectl top pods -l app=django-messaging
+
+# Clean up port-forwarding
+kill $PORT_FORWARD_PID
+
+echo "=== Script Completed ==="
