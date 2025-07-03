@@ -31,13 +31,38 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-django pytest-cov
+        pip install pytest pytest-django pytest-cov flake8
 
-    - name: Run migrations and tests
+    - name: Run flake8 linting
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run migrations
       env:
         DATABASE_URL: mysql://root:root@localhost:3306/test_db
         DJANGO_SETTINGS_MODULE: messaging_app.settings
       run: |
         python manage.py migrate
-        python manage.py test
-        pytest --cov=.
+
+    - name: Run tests with coverage
+      env:
+        DATABASE_URL: mysql://root:root@localhost:3306/test_db
+        DJANGO_SETTINGS_MODULE: messaging_app.settings
+      run: |
+        pytest --cov=. --cov-report=xml:coverage.xml
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: coverage.xml
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: |
+          **/test-results.xml
+          **/junit.xml
