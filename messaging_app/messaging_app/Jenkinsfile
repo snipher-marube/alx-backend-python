@@ -1,8 +1,14 @@
 pipeline {
     agent any
     
+    environment {
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials')
+        DOCKER_IMAGE = 'your-dockerhub-username/messaging-app'
+        DOCKER_TAG = "${env.BUILD_ID}"
+    }
+    
     tools {
-        python "Python3"  // Name of your Python installation in Jenkins
+        python "Python3"
     }
     
     stages {
@@ -17,7 +23,6 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh 'pip3 install -r messaging_app/requirements.txt'
-                // Additional installation if needed
                 sh 'pip3 install pytest pytest-cov'
             }
         }
@@ -31,8 +36,29 @@ pipeline {
             post {
                 always {
                     junit 'messaging_app/test-results.xml'
-                    // Optional: Publish coverage report if you have the Cobertura plugin
                     cobertura coberturaReportFile: 'messaging_app/coverage.xml'
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                dir('messaging_app') {
+                    script {
+                        docker.build("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}")
+                    }
+                }
+            }
+        }
+        
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").push()
+                        // Optionally push as latest
+                        docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").push('latest')
+                    }
                 }
             }
         }
@@ -40,12 +66,11 @@ pipeline {
     
     post {
         always {
-            // Optional: Archive test results and clean up
             archiveArtifacts artifacts: 'messaging_app/test-results.xml', fingerprint: true
             cleanWs()
         }
         success {
-            echo 'Pipeline completed successfully'
+            echo "Pipeline completed successfully. Docker image pushed as ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
         }
         failure {
             echo 'Pipeline failed'
